@@ -4,7 +4,7 @@ import numpy as np
 from sqlalchemy import create_engine
 import sqlalchemy as db
 from sqlalchemy.orm import sessionmaker
-
+from sqlalchemy.dialects.postgresql import insert
 
 def load_config():
     with open("config/config.json") as f:
@@ -31,19 +31,25 @@ def custom_drop_duplicates(df, subset=None):  # функция для удале
     return pd.concat([non_nan_duplicates, nan_rows], ignore_index=True)
 
 def load_to_db(df, table_name, schema):
-    # подключиться к БД
+    # подключение к базе данных на локальном компьютере
     password = load_config()["password"]
     database_loc = f"postgresql://postgres:{password}@localhost:5432/postgres"
     engine = create_engine(database_loc)
-    df.columns = df.columns.str.lower()
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = SessionLocal()
+    df.columns = df.columns.str.lower()# преобразование полей датафреймов в нижний регистр (чтобы совпадали с полями в базе)
+    data_list = df.to_dict(orient='records')
     meta = db.MetaData(schema)
     table = db.Table(table_name, meta, autoload_with=engine, schema=schema)
-    with engine.connect() as conn:
-        conn.execute(table.delete())
-        conn.commit()
-    df.to_sql(table_name, con=engine, schema=schema,if_exists='append', index=False)
-    conn.commit()
-    conn.close()
+    primary_keys = [key.name for key in table.primary_key] #первичные ключи таблицы
+    # вставка данных в таблицу, или обновление при конфликте
+    stmt = insert(table).values(data_list).on_conflict_do_update(
+        index_elements=primary_keys,
+        set_={col.name: col for col in insert(table).excluded if col.name not in primary_keys}
+    )
+    session.execute(stmt)
+    session.commit()
+    session.close()
 
 
 md_ledger_account_s = pd.DataFrame()
@@ -53,12 +59,12 @@ ft_posting_f = pd.DataFrame()
 md_currency_d = pd.DataFrame()
 md_exchange_rate_d = pd.DataFrame()
 
-md_ledger_account_s = extract('md_ledger_account_s.csv', delimiter=';', encoding='cp866')
-ft_balance_f = extract('ft_balance_f.csv', delimiter=';')
-ft_posting_f = extract('ft_posting_f.csv', delimiter =';')
-md_account_d = extract('md_account_d.csv', delimiter=';')
-md_currency_d = extract('md_currency_d.csv', delimiter=';', encoding='cp866')
-md_exchange_rate_d = extract('md_exchange_rate_d.csv', delimiter=';')
+md_ledger_account_s = extract('files/md_ledger_account_s.csv', delimiter=';', encoding='cp866')
+ft_balance_f = extract('files/ft_balance_f.csv', delimiter=';')
+ft_posting_f = extract('files/ft_posting_f.csv', delimiter =';')
+md_account_d = extract('files/md_account_d.csv', delimiter=';')
+md_currency_d = extract('files/md_currency_d.csv', delimiter=';', encoding='cp866')
+md_exchange_rate_d = extract('files/md_exchange_rate_d.csv', delimiter=';')
 
 # можно оставить цикл для удаления первой колонки у пяти фреймов: (тогда надо добавить лист выше)
 md_ledger_account_s.drop(md_ledger_account_s.columns[[0]], axis= 1 , inplace= True)
