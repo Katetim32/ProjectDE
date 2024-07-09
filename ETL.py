@@ -38,6 +38,7 @@ def load_to_db(df, table_name, schema):
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = SessionLocal()
     df.columns = df.columns.str.lower()# преобразование полей датафреймов в нижний регистр (чтобы совпадали с полями в базе)
+    df.replace({np.nan: None}, inplace=True)
     data_list = df.to_dict(orient='records')
     meta = db.MetaData(schema)
     table = db.Table(table_name, meta, autoload_with=engine, schema=schema)
@@ -51,7 +52,7 @@ def load_to_db(df, table_name, schema):
     session.commit()
     session.close()
 
-
+# создание датафреймов
 md_ledger_account_s = pd.DataFrame()
 md_account_d = pd.DataFrame()
 ft_balance_f = pd.DataFrame()
@@ -59,6 +60,7 @@ ft_posting_f = pd.DataFrame()
 md_currency_d = pd.DataFrame()
 md_exchange_rate_d = pd.DataFrame()
 
+# процесс Extract - извлечение данных
 md_ledger_account_s = extract('files/md_ledger_account_s.csv', delimiter=';', encoding='cp866')
 ft_balance_f = extract('files/ft_balance_f.csv', delimiter=';')
 ft_posting_f = extract('files/ft_posting_f.csv', delimiter =';')
@@ -66,21 +68,26 @@ md_account_d = extract('files/md_account_d.csv', delimiter=';')
 md_currency_d = extract('files/md_currency_d.csv', delimiter=';', encoding='cp866')
 md_exchange_rate_d = extract('files/md_exchange_rate_d.csv', delimiter=';')
 
-# можно оставить цикл для удаления первой колонки у пяти фреймов: (тогда надо добавить лист выше)
-md_ledger_account_s.drop(md_ledger_account_s.columns[[0]], axis= 1 , inplace= True)
-ft_balance_f.drop(ft_balance_f.columns[[0]], axis= 1 , inplace= True)
-md_account_d.drop(md_account_d.columns[[0]], axis= 1 , inplace= True)
-md_currency_d.drop(md_currency_d.columns[[0]], axis= 1 , inplace= True)
-md_exchange_rate_d.drop(md_exchange_rate_d.columns[[0]], axis= 1 , inplace= True)
+# Transform - преобразование данных
+# удаление столбца последовательности для 5 датафреймов,
+# во фрейме ft_posting_f этот столбец нужен для составного ключа
+list_of_df = [md_ledger_account_s, md_account_d, ft_balance_f, md_currency_d, md_exchange_rate_d]
+for df in list_of_df:
+    df.drop(df.columns[[0]], axis= 1 , inplace= True)
 
 ft_posting_f.columns.values[0] = 'id'
 
 list_of_df = [md_ledger_account_s, md_account_d, ft_balance_f, ft_posting_f, md_currency_d, md_exchange_rate_d]
+list_of_file_names = ['md_ledger_account_s', 'md_account_d', 'ft_balance_f', 'ft_posting_f', 'md_currency_d',
+                      'md_exchange_rate_d']
 
+# вызов функции для удаления дубликатов в таблицах
 for i in range(len(list_of_df)):
     list_of_df[i] = custom_drop_duplicates(list_of_df[i])
+#print(list_of_df[0])
+list_of_df[0] = list_of_df[0].astype({'PAIR_ACCOUNT': 'Int64'}) # в датафрейме был тип float64, преобразую в Int64
+# поскольку в базе этот столбец имеет тип varchar(5)
 
-list_of_df[0] = list_of_df[0].astype({'PAIR_ACCOUNT': 'Int64'})
-
-# вызов функции в цикле будет
-load_to_db(list_of_df[5], 'md_exchange_rate_d', 'ds')
+# Load - загрузка данных в базу
+for i in range(len(list_of_df)):
+    load_to_db(list_of_df[i], list_of_file_names[i], 'ds')
