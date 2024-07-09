@@ -1,9 +1,15 @@
+import json
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 import sqlalchemy as db
 from sqlalchemy.orm import sessionmaker
 
+
+def load_config():
+    with open("config/config.json") as f:
+        config = json.load(f)
+    return config
 
 def extract(name, delimiter=';', encoding='utf-8'):  # функция для загрузки данных из файлов csv в датафреймы
     return pd.read_csv(name, delimiter=delimiter, encoding=encoding)
@@ -24,8 +30,11 @@ def custom_drop_duplicates(df, subset=None):  # функция для удале
 
     return pd.concat([non_nan_duplicates, nan_rows], ignore_index=True)
 
-def load_to_db(df, table_name, engine, schema):
+def load_to_db(df, table_name, schema):
     # подключиться к БД
+    password = load_config()["password"]
+    database_loc = f"postgresql://postgres:{password}@localhost:5432/postgres"
+    engine = create_engine(database_loc)
     df.columns = df.columns.str.lower()
     meta = db.MetaData(schema)
     table = db.Table(table_name, meta, autoload_with=engine, schema=schema)
@@ -33,7 +42,8 @@ def load_to_db(df, table_name, engine, schema):
         conn.execute(table.delete())
         conn.commit()
     df.to_sql(table_name, con=engine, schema=schema,if_exists='append', index=False)
-    # прервать соединение с БД
+    conn.commit()
+    conn.close()
 
 
 md_ledger_account_s = pd.DataFrame()
@@ -66,8 +76,5 @@ for i in range(len(list_of_df)):
 
 list_of_df[0] = list_of_df[0].astype({'PAIR_ACCOUNT': 'Int64'})
 
-# подключение убрать в функцию load_to_db
-database_loc = f"postgresql://student12:pheih0Ee@adhcluster2.neoflex.ru:8000/postgres"
-engine = create_engine(database_loc)
 # вызов функции в цикле будет
-load_to_db(list_of_df[3], 'ft_posting_f', engine, 'ds')
+load_to_db(list_of_df[5], 'md_exchange_rate_d', 'ds')
