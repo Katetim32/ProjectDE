@@ -7,10 +7,13 @@ import sqlalchemy as db
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.postgresql import insert
 import socket
+
+
 def load_config():
     with open("config/config.json") as f:
         config = json.load(f)
     return config
+
 
 def extract(name, delimiter=';', encoding='utf-8'):  # функция для загрузки данных из файлов csv в датафреймы
     return pd.read_csv(name, delimiter=delimiter, encoding=encoding)
@@ -30,6 +33,23 @@ def custom_drop_duplicates(df, subset=None):  # функция для удале
     nan_rows = df[mask]
 
     return pd.concat([non_nan_duplicates, nan_rows], ignore_index=True)
+
+
+# функция преобразования данных в датафреймах
+def transform(list_of_df):
+    for index, df in enumerate(list_of_df):
+        if id(df) == id(ft_posting_f):
+            df.columns.values[0] = 'id'
+        else:
+            if id(df) == id(md_ledger_account_s):
+                df = df.astype(
+                    {'PAIR_ACCOUNT': 'Int64'})  # в датафрейме был тип float64, преобразую в Int64
+                # поскольку в базе этот столбец имеет тип varchar(5)
+                list_of_df[index] = df
+            df.drop(df.columns[[0]], axis=1, inplace=True)
+    for el in range(len(list_of_df)):
+        list_of_df[el] = custom_drop_duplicates(list_of_df[el])
+    return list_of_df
 
 
 # функция для логирования
@@ -52,6 +72,7 @@ def log_to_db(message, engine, tablename, operation, status, client_addr, client
     session.close()
 
 
+# функция для загрузки данных из датафреймов в базу данных
 def load_to_db(df, table_name, schema):
     # подключение к базе данных на локальном компьютере
     password = load_config()["password"]
@@ -81,7 +102,6 @@ def load_to_db(df, table_name, schema):
         session.execute(stmt)
         session.commit()
         session.close()
-        time.sleep(5)
         log_to_db(f"Окончание загрузки данных в таблицу {table_name}", engine, table_name, 'UPSERT', 'succeed',
                   client_addr, client_hostname)
 
@@ -106,27 +126,14 @@ md_account_d = extract('files/md_account_d.csv', delimiter=';')
 md_currency_d = extract('files/md_currency_d.csv', delimiter=';', encoding='cp866')
 md_exchange_rate_d = extract('files/md_exchange_rate_d.csv', delimiter=';')
 
-# запихнуть в функцию Transform ?
-# Transform - преобразование данных
-# удаление столбца последовательности для 5 датафреймов,
-# во фрейме ft_posting_f этот столбец нужен для составного ключа
-list_of_df = [md_ledger_account_s, md_account_d, ft_balance_f, md_currency_d, md_exchange_rate_d]
-for df in list_of_df:
-    df.drop(df.columns[[0]], axis= 1 , inplace= True)
-
-ft_posting_f.columns.values[0] = 'id'
-
+# процесс Transform - преобразование данных
 list_of_df = [md_ledger_account_s, md_account_d, ft_balance_f, ft_posting_f, md_currency_d, md_exchange_rate_d]
 list_of_file_names = ['md_ledger_account_s', 'md_account_d', 'ft_balance_f', 'ft_posting_f', 'md_currency_d',
                       'md_exchange_rate_d']
+list_of_df = transform(list_of_df)
 
-# вызов функции для удаления дубликатов в таблицах
-for i in range(len(list_of_df)):
-    list_of_df[i] = custom_drop_duplicates(list_of_df[i])
-#print(list_of_df[0])
-list_of_df[0] = list_of_df[0].astype({'PAIR_ACCOUNT': 'Int64'}) # в датафрейме был тип float64, преобразую в Int64
-# поскольку в базе этот столбец имеет тип varchar(5)
-
-# Load - загрузка данных в базу
+# процесс Load - загрузка данных в базу
 for i in range(len(list_of_df)):
     load_to_db(list_of_df[i], list_of_file_names[i], 'ds')
+    if i == 0:
+        time.sleep(5)
