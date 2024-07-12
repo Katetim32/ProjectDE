@@ -31,7 +31,6 @@ def custom_drop_duplicates(df, subset=None):  # функция для удале
     mask = df[subset].isna().any(axis=1)
     non_nan_duplicates = df[~mask].drop_duplicates(subset=subset, keep='first')
     nan_rows = df[mask]
-
     return pd.concat([non_nan_duplicates, nan_rows], ignore_index=True)
 
 
@@ -128,12 +127,12 @@ md_exchange_rate_d = extract('files/md_exchange_rate_d.csv', delimiter=';')
 
 # процесс Transform - преобразование данных
 list_of_df = [md_ledger_account_s, md_account_d, ft_balance_f, ft_posting_f, md_currency_d, md_exchange_rate_d]
-list_of_file_names = ['md_ledger_account_s', 'md_account_d', 'ft_balance_f', 'ft_posting_f', 'md_currency_d',
+list_of_table_names = ['md_ledger_account_s', 'md_account_d', 'ft_balance_f', 'ft_posting_f', 'md_currency_d',
                       'md_exchange_rate_d']
 list_of_df = transform(list_of_df)
 
 # процесс Load - загрузка данных в базу
 for i in range(len(list_of_df)):
-    load_to_db(list_of_df[i], list_of_file_names[i], 'ds')
+    load_to_db(list_of_df[i], list_of_table_names[i], 'ds')
     if i == 0:
         time.sleep(5)
