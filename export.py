@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 import socket
 from ETL import load_config, log_to_db
 
-
+# функция для извлечения данных из базы
 def extract_from_db(engine, table_name, schema):
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = SessionLocal()
@@ -20,7 +20,7 @@ def extract_from_db(engine, table_name, schema):
 
     return df
 
-
+# функция для экспорта данных из таблицы dm_f101_round_f в csv-файл
 def export(df, file_name, engine):
     client_hostname = socket.gethostname()
     client_addr = socket.gethostbyname(client_hostname)
@@ -32,7 +32,9 @@ def export(df, file_name, engine):
         log_to_db(f"Окончание экспорта данных в csv-файл {file_name}", engine, 'dm_f101_round_f', 'Export', 'succeed',
               client_addr, client_hostname)
     except Exception as e:
-        log_to_db(f"Ошибка при экспорте данных в csv-файл{file_name}: {str(e)}", engine, 'dm_f101_round_f', 'Export', 'succeed',
+        error_message = f"Ошибка при экспорте данных в csv-файл{file_name}: {str(e)}"
+        error_message = error_message[:100]
+        log_to_db(error_message, engine, 'dm_f101_round_f', 'Export', 'succeed',
                   client_addr, client_hostname)
 
 
