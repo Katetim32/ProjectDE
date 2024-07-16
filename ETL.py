@@ -94,10 +94,13 @@ def load_to_db(df, table_name, schema):
         table = db.Table(table_name, meta, autoload_with=engine, schema=schema)
         primary_keys = [key.name for key in table.primary_key] #первичные ключи таблицы
         # вставка данных в таблицу, или обновление при конфликте
-        stmt = insert(table).values(data_list).on_conflict_do_update(
-            index_elements=primary_keys,
-            set_={col.name: col for col in insert(table).excluded if col.name not in primary_keys}
-        )
+        if primary_keys:
+            stmt = insert(table).values(data_list).on_conflict_do_update(
+                index_elements=primary_keys,
+                set_={col.name: col for col in insert(table).excluded if col.name not in primary_keys}
+            )
+        else:
+            stmt = insert(table).values(data_list).on_conflict_do_nothing()
         session.execute(stmt)
         session.commit()
         session.close()
@@ -105,7 +108,9 @@ def load_to_db(df, table_name, schema):
                   client_addr, client_hostname)
 
     except Exception as e:
-        log_to_db(f"Ошибка при загрузке данных в таблицу {table_name}: {str(e)}", engine, table_name, 'UPSERT',
+        error_message = f"Ошибка при загрузке данных в таблицу {table_name}: {str(e)}"
+        error_message = error_message[:100]
+        log_to_db(error_message, engine, table_name, 'UPSERT',
                   'failed', client_addr, client_hostname)
 
 if __name__ == "__main__":
