@@ -108,31 +108,31 @@ def load_to_db(df, table_name, schema):
         log_to_db(f"Ошибка при загрузке данных в таблицу {table_name}: {str(e)}", engine, table_name, 'UPSERT',
                   'failed', client_addr, client_hostname)
 
+if __name__ == "__main__":
+    # создание датафреймов
+    md_ledger_account_s = pd.DataFrame()
+    md_account_d = pd.DataFrame()
+    ft_balance_f = pd.DataFrame()
+    ft_posting_f = pd.DataFrame()
+    md_currency_d = pd.DataFrame()
+    md_exchange_rate_d = pd.DataFrame()
 
-# создание датафреймов
-md_ledger_account_s = pd.DataFrame()
-md_account_d = pd.DataFrame()
-ft_balance_f = pd.DataFrame()
-ft_posting_f = pd.DataFrame()
-md_currency_d = pd.DataFrame()
-md_exchange_rate_d = pd.DataFrame()
+    # процесс Extract - извлечение данных
+    md_ledger_account_s = extract('files/md_ledger_account_s.csv', delimiter=';', encoding='cp866')
+    ft_balance_f = extract('files/ft_balance_f.csv', delimiter=';')
+    ft_posting_f = extract('files/ft_posting_f.csv', delimiter =';')
+    md_account_d = extract('files/md_account_d.csv', delimiter=';')
+    md_currency_d = extract('files/md_currency_d.csv', delimiter=';', encoding='cp866')
+    md_exchange_rate_d = extract('files/md_exchange_rate_d.csv', delimiter=';')
 
-# процесс Extract - извлечение данных
-md_ledger_account_s = extract('files/md_ledger_account_s.csv', delimiter=';', encoding='cp866')
-ft_balance_f = extract('files/ft_balance_f.csv', delimiter=';')
-ft_posting_f = extract('files/ft_posting_f.csv', delimiter =';')
-md_account_d = extract('files/md_account_d.csv', delimiter=';')
-md_currency_d = extract('files/md_currency_d.csv', delimiter=';', encoding='cp866')
-md_exchange_rate_d = extract('files/md_exchange_rate_d.csv', delimiter=';')
+    # процесс Transform - преобразование данных
+    list_of_df = [md_ledger_account_s, md_account_d, ft_balance_f, ft_posting_f, md_currency_d, md_exchange_rate_d]
+    list_of_table_names = ['md_ledger_account_s', 'md_account_d', 'ft_balance_f', 'ft_posting_f', 'md_currency_d',
+                          'md_exchange_rate_d']
+    list_of_df = transform(list_of_df)
 
-# процесс Transform - преобразование данных
-list_of_df = [md_ledger_account_s, md_account_d, ft_balance_f, ft_posting_f, md_currency_d, md_exchange_rate_d]
-list_of_table_names = ['md_ledger_account_s', 'md_account_d', 'ft_balance_f', 'ft_posting_f', 'md_currency_d',
-                      'md_exchange_rate_d']
-list_of_df = transform(list_of_df)
-
-# процесс Load - загрузка данных в базу
-for i in range(len(list_of_df)):
-    load_to_db(list_of_df[i], list_of_table_names[i], 'ds')
-    if i == 0:
-        time.sleep(5)
+    # процесс Load - загрузка данных в базу
+    for i in range(len(list_of_df)):
+        load_to_db(list_of_df[i], list_of_table_names[i], 'ds')
+        if i == 0:
+            time.sleep(5)
