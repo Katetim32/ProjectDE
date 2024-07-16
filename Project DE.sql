@@ -85,10 +85,11 @@ create table md_ledger_account_s(
 --проверка данных в таблицах
 select * from md_ledger_account_s;
 select * from md_account_d ;
-select * from ft_balance_f fbf ;
-select * from ft_posting_f fpf ;
+select * from ft_balance_f fbf where account_rk = 17244;--17244, balance_out до: 25852.49 после: 45688.98
+select * from ft_posting_f fpf ; 
 select * from md_currency_d;
 select * from md_exchange_rate_d merd ;
+
 --delete  from md_exchange_rate_d ;
 --delete from ft_balance_f ;
 --delete from ft_posting_f ;
@@ -114,3 +115,4 @@ create table logs(
 -- проверка логов в таблице
 select * from logs;
 --delete from logs;
+
